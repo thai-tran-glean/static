@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Arena</title>
+    <style>
+        body {
+            font-family: Arial
+        }
+        .controls {
+            margin-top: 12px;
+        }
+        .warning {
+            margin-top: 12px;
+            font-size: 0.8em;
+            color: #aa0000;
+        }
+    </style>
+</head>
+<body>
+    <h3>Chat Arena</h1>
+    <div>
+        <textarea id="message" rows=10 cols=80 placeholder="Enter your chat message" onkeydown="handleKeyPress(event)"></textarea>
+    </div>
+    <div class="controls">
+        <button onclick="chat()">Chat</button>
+        <button onclick="clearInput()">Clear</button>
+        <button onclick="closeWindows()">Close Windows</button>
+        <select id="agent">
+            <option value="GPT">Public Knowledge</option>
+            <option value="" selected>Company Knowledge</option>
+        </select>
+        <input type="checkbox" id="debug"> Debug mode
+    </div>
+    <div class="controls">
+        Model 1:
+        <select id="model1" onchange="updateModel(0, this.value)"></select>
+        Model 2:
+        <select id="model2" onchange="updateModel(1, this.value)"></select>
+        Model 3:
+        <select id="model3" onchange="updateModel(2, this.value)"></select>
+    </div>
+    <div class="warning">
+        After you use this tool for the first time, tell your browser to allow popups so you can see all the models.
+    </div>
+
+    <script>
+        let availableModels = {
+            'GPT-4-Turbo': { capable: "azure-gpt4-turbo-0125-8k", fast: "azure-turbo" },
+            'GPT-4o': { capable: "azure-gpt4o-2024-05-13-8k", fast: "gpt-4o-mini-2024-07-18-8k" },
+            'GPT-4o mini': { capable: "gpt-4o-mini-2024-07-18-8k", fast: "gpt-4o-mini-2024-07-18-8k" },
+            'Claude 3.5 Sonnet': { capable: "claude-3-5-sonnet-vertex-8k", fast: "claude-3-haiku-vertex-8k" },
+            'Claude 3.5 Sonnet v2': { capable: "claude-3-5-sonnet2-vertex-8k", fast: "claude-3-haiku-vertex-8k" },
+            'Claude 3 Haiku': { capable: "claude-3-haiku-vertex-8k", fast: "claude-3-haiku-vertex-8k" },
+            'Claude 3 Opus': { capable: "claude-3-opus-8k", fast: "claude-3-haiku-8k" },
+            'Gemini 1.5 Pro': { capable: "gemini-1.5-pro-8k", fast: "gemini-1.5-flash-8k" },
+            'Gemini 1.5 Flash': { capable: "gemini-1.5-flash-8k", fast: "gemini-1.5-flash-8k" },
+            'PaLM 2': { capable: "text-unicorn-001", fast: "text-bison"},
+        }
+
+        model1Default = 'GPT-4o';
+        model2Default = 'Claude 3.5 Sonnet';
+        model3Default = 'Claude 3.5 Sonnet v2';
+
+        var models = [
+            availableModels[model1Default],
+            availableModels[model2Default],
+            availableModels[model3Default]
+        ];
+
+        let windowWidth = Math.min(screen.width / models.length, 800);
+        let windowHeight = screen.height - 400;
+
+        var gleanChat = []
+        for (let i = 0; i < models.length; i++) {
+            gleanChat.push({
+                modelCapable: models[i].capable,
+                modelFast: models[i].fast,
+                window: null
+            });                    
+        }
+
+        function runAfterDelay(ms, callback) {
+            setTimeout(callback, ms);
+        }
+          
+        function handleKeyPress(event) {
+            if (event.key === "Enter") {
+                chat();
+            }
+        }
+
+        function clearInput() {
+            document.getElementById("message").value = "";
+        }
+
+        function closeWindows() {
+            for (let i = 0; i < gleanChat.length; i++) {
+                if (gleanChat[i].window) {
+                    gleanChat[i].window.close();
+                }
+            }
+        }
+
+        function chat() {
+            closeWindows();
+
+            var message = encodeURIComponent(document.getElementById("message").value);
+            var agent = document.getElementById("agent").value;
+            var debug = document.getElementById("debug").checked;
+            
+            if (debug) {
+                debugSC = "db.debug_mode%3D1%2C";
+            } else {
+                debugSC = "";
+            } 
+
+            for (let i = 0; i < gleanChat.length; i++) {
+                let url = "https://app.glean.com/chat?chatAgent=" + agent +
+                    "&sc=" + debugSC + "llmo.model_overrides%3D" + 
+                    "chat%253Areact_tools_2_hops%253Aplan%253A" + gleanChat[i].modelCapable +
+                    "%253Bchat%253Areact_tools_2_hops%253Aact%253A" + gleanChat[i].modelCapable + 
+                    "%253Bchat%253Areact_tools_2_hops%253Afollowup%253A" + gleanChat[i].modelFast + 
+                    "%253Bchat%253Agpt%253Aact%253A" + gleanChat[i].modelCapable +
+                    "%253Bchat%253Agpt%253Afollowup%253A" + gleanChat[i].modelFast + 
+                    "%253Bchat%253Areact_tools_2_hops%253Atools_filter%253A" + gleanChat[i].modelFast +
+                    "&message=" + message;
+
+                gleanChat[i].window = window.open(url, "_blank", "width=" + windowWidth + ",height=" + windowHeight + ",top=0,left=" + i*(windowWidth+0));
+            }
+        }
+
+        function populateModelSelectors() {
+            const modelSelectors = ['model1', 'model2', 'model3'];
+            const defaultModels = [model1Default, model2Default, model3Default];
+            modelSelectors.forEach((selectorId, index) => {
+                const selectElement = document.getElementById(selectorId);
+                for (const modelName in availableModels) {
+                    const option = document.createElement('option');
+                    option.value = modelName;
+                    option.text = modelName;
+                    if (modelName === defaultModels[index]) {
+                        option.selected = true;
+                    }
+                    selectElement.appendChild(option);
+                }
+            });
+        }
+           
+        function updateModel(index, modelName) {
+            models[index] = availableModels[modelName];
+            gleanChat[index].modelCapable = models[index].capable;
+            gleanChat[index].modelFast = models[index].fast;
+        }
+
+        // Populate the model selectors on page load
+        window.onload = function() {
+            populateModelSelectors();
+        };
+    </script>
+</body>
+</html>
